@@ -1,5 +1,6 @@
 import numpy as np
 import pandas as pd
+import config
 
 def ndcg_at_k(y_true, y_score, k=10):
     """NDCG@k. Документы со score=-inf (вне top-K каскада) не дают вклада в DCG."""
@@ -50,3 +51,24 @@ def cascade_predict(cheap_model, expensive_model, df, k,
         }))
 
     return pd.concat(results, ignore_index=True)
+
+def cascade_cost_per_query(k, n_docs, cost_cheap=None, cost_expensive=None):
+    """Стоимость одного запроса в условных единицах.
+
+    k: лимит на дорогую модель (сколько документов уйдёт)
+    n_docs: сколько документов у запроса
+    """
+    if cost_cheap is None:
+        cost_cheap = config.COST_CHEAP
+    if cost_expensive is None:
+        cost_expensive = config.COST_EXPENSIVE
+    return n_docs * cost_cheap + min(k, n_docs) * cost_expensive
+
+
+def mean_cascade_cost(df, k):
+    """Средняя стоимость на запрос по всем запросам в df."""
+    costs = [
+        cascade_cost_per_query(k, len(g))
+        for _, g in df.groupby("query_id")
+    ]
+    return float(np.mean(costs))
